@@ -3,145 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIN ST - Pro Remote</title>
+    <title>AZIN ST - Final Fix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: white; text-align: center; padding: 15px; margin: 0; }
-        .container { max-width: 500px; margin: auto; background: #161b22; border-radius: 20px; padding: 20px; border: 1px solid #30363d; }
-        video { width: 100%; border-radius: 15px; background: #000; margin-top: 15px; transform: scaleX(1); }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; color: white; }
-        .btn-blue { background: #1f6feb; width: 100%; margin-bottom: 10px; }
-        .btn-green { background: #238636; }
-        .btn-red { background: #da3633; }
-        .status-bar { font-size: 13px; color: #8b949e; margin: 10px 0; padding: 8px; background: #0d1117; border-radius: 5px; }
-        #link-section { display: none; background: #0d1117; padding: 10px; border-radius: 10px; border: 1px dashed #58a6ff; margin-bottom: 15px; }
+        body { font-family: sans-serif; background: #0b0e14; color: white; text-align: center; padding: 10px; }
+        .box { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; }
+        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; height: 250px; object-fit: cover; }
+        .btn { background: #238636; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        .status { font-size: 12px; color: #8b949e; margin: 10px 0; }
+        #remoteControls { display: none; margin-top: 10px; gap: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>AZIN ST Control Panel</h2>
+<div class="box">
+    <h2>AZIN ST Pro</h2>
     
-    <div id="setup-section">
-        <button class="btn btn-blue" onclick="generateLink()">Link Generate Karein</button>
-        <div id="link-section">
-            <p id="shareUrl" style="font-size: 11px; word-break: break-all; color: #58a6ff;"></p>
-            <button class="btn btn-green" onclick="copyLink()">Copy Link</button>
-        </div>
+    <div id="host-ui">
+        <button class="btn" style="background:#1f6feb;" onclick="makeLink()">Generate Link</button>
+        <p id="linkDisplay" style="font-size:10px; word-break:break-all; margin-top:10px; color:#58a6ff;"></p>
     </div>
 
-    <div id="join-section" style="display: none;">
-        <button class="btn btn-blue" onclick="startRemote('screen')">Share Screen</button>
-        <button class="btn btn-green" onclick="startRemote('camera')">Share Camera</button>
+    <div id="join-ui" style="display:none;">
+        <button class="btn" onclick="startStream('screen')">Share Mobile Screen</button>
+        <button class="btn" style="background:#8957e5;" onclick="startStream('camera')">Open Camera</button>
     </div>
 
-    <div class="status-bar" id="status">Status: Waiting...</div>
+    <p class="status" id="status">Status: Connecting to PeerServer...</p>
     
-    <video id="remoteVideo" autoplay playsinline></video>
-
-    <div class="controls" id="remoteControls" style="display: none;">
-        <button class="btn btn-blue" onclick="switchCamera()">Switch Camera</button>
-        <button id="micBtn" class="btn btn-red" onclick="toggleMic()">Mute Mic</button>
-    </div>
+    <video id="v-view" autoplay playsinline></video>
 </div>
 
 <script>
-    const peer = new Peer();
-    let currentStream;
-    let useBackCamera = false;
+    // Google STUN Servers jo connection ko block hone se bachate hain
+    const peerConfig = {
+        config: {
+            'iceServers': [
+                { url: 'stun:stun.l.google.com:19302' },
+                { url: 'stun:stun1.l.google.com:19302' }
+            ]
+        }
+    };
+
+    const peer = new Peer(peerConfig);
     const urlParams = new URLSearchParams(window.location.search);
     const joinID = urlParams.get('join');
 
     peer.on('open', id => {
+        document.getElementById('status').innerText = "Status: Online";
         if(joinID) {
-            document.getElementById('setup-section').style.display = 'none';
-            document.getElementById('join-section').style.display = 'block';
-            document.getElementById('status').innerText = "Status: Connected to Server";
+            document.getElementById('host-ui').style.display = 'none';
+            document.getElementById('join-ui').style.display = 'block';
         }
     });
 
-    function generateLink() {
+    function makeLink() {
         const link = window.location.href.split('?')[0] + "?join=" + peer.id;
-        document.getElementById('shareUrl').innerText = link;
-        document.getElementById('link-section').style.display = 'block';
+        document.getElementById('linkDisplay').innerText = link;
+        navigator.clipboard.writeText(link);
+        alert("Link Copy Ho Gaya!");
     }
 
-    function copyLink() {
-        navigator.clipboard.writeText(document.getElementById('shareUrl').innerText);
-        alert("Link Copied!");
-    }
-
-    async function startRemote(type) {
+    async function startStream(mode) {
         try {
-            document.getElementById('status').innerText = "Accessing " + type + "...";
             let stream;
-            
-            if(type === 'screen') {
+            if(mode === 'screen') {
                 stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
             } else {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: useBackCamera ? "environment" : "user" }, 
-                    audio: true 
-                });
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             }
-            
-            currentStream = stream;
-            const call = peer.call(joinID, stream);
-            document.getElementById('remoteControls').style.display = 'grid';
-            handleStream(call);
-        } catch (err) {
-            alert("Permission Denied!");
-            document.getElementById('status').innerText = "Error: " + err.name;
-        }
-    }
 
-    function handleStream(call) {
-        call.on('stream', remoteStream => {
-            document.getElementById('remoteVideo').srcObject = remoteStream;
-            document.getElementById('status').innerText = "Live Streaming...";
-        });
+            const call = peer.call(joinID, stream);
+            document.getElementById('status').innerText = "Streaming...";
+
+            call.on('stream', remoteStream => {
+                document.getElementById('v-view').srcObject = remoteStream;
+            });
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
     }
 
     peer.on('call', async call => {
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        call.answer(audioStream);
-        handleStream(call);
-        document.getElementById('remoteControls').style.display = 'grid';
-    });
-
-    // Control Functions
-    async function switchCamera() {
-        if (!currentStream) return;
-        useBackCamera = !useBackCamera;
-        
-        // Stop old tracks
-        currentStream.getTracks().forEach(track => track.stop());
-        
-        // Start with new camera
-        const newStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: useBackCamera ? "environment" : "user" }, 
-            audio: true 
+        // Answer with Mic to enable two-way talk
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+        call.answer(mic);
+        call.on('stream', remoteStream => {
+            document.getElementById('v-view').srcObject = remoteStream;
+            document.getElementById('status').innerText = "Live Connected!";
         });
-        
-        currentStream = newStream;
-        // Re-call logic would go here, but for now it updates local view
-        // PeerJS re-negotiation is complex, so simple refresh is better for prototype
-        alert("Camera switched. Please restart stream for remote view.");
-    }
-
-    function toggleMic() {
-        const audioTrack = currentStream.getAudioTracks()[0];
-        if (audioTrack.enabled) {
-            audioTrack.enabled = false;
-            document.getElementById('micBtn').innerText = "Unmute Mic";
-            document.getElementById('micBtn').style.background = "#238636";
-        } else {
-            audioTrack.enabled = true;
-            document.getElementById('micBtn').innerText = "Mute Mic";
-            document.getElementById('micBtn').style.background = "#da3633";
-        }
-    }
+    });
 </script>
 
 </body>
