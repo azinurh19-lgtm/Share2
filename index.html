@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>livve - Live Stream & Chat</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #0b0e14; color: #e1e1e1; padding: 20px; }
+        .card { background: #161b22; padding: 25px; border-radius: 20px; max-width: 500px; margin: auto; border: 1px solid #30363d; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        h2 { color: #58a6ff; margin-bottom: 5px; }
+        video { width: 100%; border-radius: 12px; background: #000; margin-top: 20px; border: 2px solid #30363d; }
+        .btn { background: #238636; color: white; border: none; padding: 14px; cursor: pointer; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 15px; transition: 0.3s; }
+        .btn:hover { background: #2ea043; }
+        #link-section { display: none; margin-top: 20px; background: #0d1117; padding: 15px; border-radius: 10px; border: 1px dashed #58a6ff; }
+        .status-box { text-align: left; margin: 15px 0; font-size: 14px; color: #8b949e; }
+        .dot { height: 10px; width: 10px; background-color: #f85149; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .online { background-color: #3fb950; box-shadow: 0 0 10px #3fb950; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>AZIN ST</h2>
+    <p style="color: #8b949e;">Screen Sharing & Two-Way Voice</p>
+    
+    <button class="btn" style="background: #1f6feb;" onclick="generateLink()">1. Generate Connection Link</button>
+    
+    <div id="link-section">
+        <p style="font-size: 12px; color: #58a6ff;">Is link ko dusre mobile par open karein:</p>
+        <p id="shareUrl" style="word-break: break-all; font-family: monospace; background: #161b22; padding: 8px; border-radius: 5px;"></p>
+        <button class="btn" onclick="copyLink()">Copy & Send Link</button>
+    </div>
+
+    <div class="status-box">
+        <span id="dot" class="dot"></span> <span id="status">Status: Waiting for Peer...</span>
+    </div>
+
+    <video id="remoteVideo" autoplay playsinline controls></video>
+    <p style="font-size: 12px; margin-top: 10px; color: #8b949e;">Note: Dono side se Mike 'Allow' karna zaroori hai.</p>
+</div>
+
+<script>
+    const peer = new Peer();
+    let myID = "";
+    let localStream;
+
+    // 1. Peer ID Setup
+    peer.on('open', (id) => {
+        myID = id;
+        console.log("My Peer ID:", id);
+    });
+
+    // 2. Link Generation Logic (CodePen Friendly)
+    function generateLink() {
+        let currentUrl = window.location.href.split('?')[0].split('#')[0];
+        // CodePen editor se bahar nikalne ke liye
+        if (currentUrl.includes("cdpn.io") || currentUrl.includes("codepen.io")) {
+            currentUrl = currentUrl.replace("/pen/", "/full/");
+        }
+        const fullUrl = `${currentUrl}?join=${myID}`;
+        document.getElementById('shareUrl').innerText = fullUrl;
+        document.getElementById('link-section').style.display = 'block';
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(document.getElementById('shareUrl').innerText);
+        alert("Link Copy Ho Gaya!");
+    }
+
+    // 3. Receiving Side (Aapka Device)
+    peer.on('call', async (call) => {
+        // Baat karne ke liye aapka mike bhi on hona chahiye
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            call.answer(localStream); // Mike access ke saath answer karein
+            
+            call.on('stream', (remoteStream) => {
+                const video = document.getElementById('remoteVideo');
+                video.srcObject = remoteStream;
+                updateStatus("Connected & Streaming", true);
+            });
+        } catch (err) {
+            alert("Mic permission error!");
+        }
+    });
+
+    // 4. Joining Side (Target Device)
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinID = urlParams.get('join');
+
+    if (joinID) {
+        window.onload = async () => {
+            updateStatus("Requesting Permissions...", false);
+            try {
+                // Screen share + Audio dono mangein
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+
+                // Saath mein Mike bhi mangein takki dono baat kar sakein
+                const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Dono streams ko mix karein
+                micStream.getAudioTracks().forEach(track => screenStream.addTrack(track));
+
+                const call = peer.call(joinID, screenStream);
+                
+                call.on('stream', (remoteStream) => {
+                    const video = document.getElementById('remoteVideo');
+                    video.srcObject = remoteStream;
+                    updateStatus("Live - Two Way Audio Active", true);
+                });
+
+            } catch (err) {
+                console.error(err);
+                updateStatus("Permission Denied", false);
+            }
+        };
+    }
+
+    function updateStatus(text, isOnline) {
+        document.getElementById('status').innerText = "Status: " + text;
+        const dot = document.getElementById('dot');
+        if (isOnline) dot.classList.add('online');
+        else dot.classList.remove('online');
+    }
+</script>
+
+</body>
+</html>
