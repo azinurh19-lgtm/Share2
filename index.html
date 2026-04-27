@@ -3,39 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIN ST - Live Connect</title>
+    <title>AZIN ST - Live Fix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #0d1117; color: #c9d1d9; padding: 20px; }
-        .card { background: #161b22; padding: 25px; border-radius: 15px; max-width: 450px; margin: auto; border: 1px solid #30363d; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
-        h2 { color: #58a6ff; }
-        video { width: 100%; border-radius: 10px; background: #000; margin-top: 20px; border: 1px solid #58a6ff; }
-        .btn { background: #238636; color: white; border: none; padding: 15px; cursor: pointer; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 10px; font-size: 16px; }
-        #link-section, #join-section { display: none; margin-top: 20px; background: #0d1117; padding: 15px; border-radius: 10px; border: 1px dashed #58a6ff; }
-        .status { margin-top: 15px; font-size: 13px; color: #8b949e; }
+        body { font-family: sans-serif; text-align: center; background: #0d1117; color: white; padding: 20px; }
+        .card { background: #161b22; padding: 20px; border-radius: 15px; border: 1px solid #30363d; max-width: 400px; margin: auto; }
+        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; }
+        .btn { background: #238636; color: white; border: none; padding: 15px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; }
+        .status { color: #8b949e; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>AZIN ST</h2>
-    <p>Real-time Screen & Audio Share</p>
+    <h2>AZIN ST Control</h2>
     
-    <button id="genBtn" class="btn" style="background: #1f6feb;" onclick="generateLink()">1. Link Banayein</button>
+    <button id="genBtn" class="btn" style="background: #1f6feb;" onclick="generateLink()">1. Naya Link Banayein</button>
     
-    <div id="link-section">
-        <p style="font-size: 12px;">Isse copy karke bhejein:</p>
-        <p id="shareUrl" style="word-break: break-all; font-family: monospace; font-size: 11px; color: #58a6ff;"></p>
-        <button class="btn" onclick="copyLink()">Copy Link</button>
+    <div id="link-box" style="display:none; margin-top:10px;">
+        <input type="text" id="urlInp" style="width:80%; padding:8px; border-radius:5px; border:none;" readonly>
+        <button class="btn" onclick="copyLink()">Copy</button>
     </div>
 
-    <div id="join-section">
-        <p>Aapko ek invite mila hai!</p>
-        <button class="btn" onclick="startSharing()">Connect & Share Screen</button>
+    <div id="join-box" style="display:none;">
+        <p>Invite Mila Hai!</p>
+        <button class="btn" onclick="startApp()">Connect Now</button>
     </div>
 
-    <div class="status" id="status">Status: Waiting...</div>
-    <video id="remoteVideo" autoplay playsinline controls></video>
+    <p class="status" id="stText">Status: Ready</p>
+    <video id="remoteView" autoplay playsinline></video>
 </div>
 
 <script>
@@ -43,60 +39,55 @@
     const urlParams = new URLSearchParams(window.location.search);
     const joinID = urlParams.get('join');
 
-    peer.on('open', (id) => {
-        console.log("My ID:", id);
-        if (joinID) {
-            // Agar link mein ID hai, toh join section dikhao
-            document.getElementById('join-section').style.display = 'block';
+    peer.on('open', id => {
+        if(joinID) {
+            document.getElementById('join-box').style.display = 'block';
             document.getElementById('genBtn').style.display = 'none';
-            document.getElementById('status').innerText = "Status: Ready to connect";
         }
     });
 
-    // 1. Link Generator
     function generateLink() {
-        const baseUrl = window.location.href.split('?')[0];
-        const fullUrl = `${baseUrl}?join=${peer.id}`;
-        document.getElementById('shareUrl').innerText = fullUrl;
-        document.getElementById('link-section').style.display = 'block';
+        const link = window.location.href.split('?')[0] + "?join=" + peer.id;
+        document.getElementById('urlInp').value = link;
+        document.getElementById('link-box').style.display = 'block';
     }
 
     function copyLink() {
-        navigator.clipboard.writeText(document.getElementById('shareUrl').innerText);
-        alert("Link Copied!");
+        document.getElementById('urlInp').select();
+        document.execCommand('copy');
+        alert("Copied!");
     }
 
-    // 2. Samne wala jab "Connect" dabayega
-    async function startSharing() {
+    async function startApp() {
+        document.getElementById('stText').innerText = "Connecting...";
         try {
-            document.getElementById('status').innerText = "Status: Accessing Screen & Mic...";
-            
-            // Screen Share
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-            // Mic (Voice)
-            const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mic.getAudioTracks().forEach(track => stream.addTrack(track));
-
-            const call = peer.call(joinID, stream);
-            document.getElementById('status').innerText = "Status: Streaming to Peer...";
-
-            call.on('stream', (remoteStream) => {
-                document.getElementById('remoteVideo').srcObject = remoteStream;
+            // Mobile ke liye pehle Camera & Mic try karte hain (sabse stable)
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user" }, 
+                audio: true 
             });
+            
+            const call = peer.call(joinID, stream);
+            
+            call.on('stream', remStream => {
+                document.getElementById('remoteView').srcObject = remStream;
+                document.getElementById('stText').innerText = "Live Connected!";
+            });
+
         } catch (err) {
-            alert("Error: Permissions denied!");
+            document.getElementById('stText').innerText = "Error: " + err.name;
             console.error(err);
+            alert("Bhai, permission popup aane par 'Allow' zaroori hai!");
         }
     }
 
-    // 3. Aapka side (Receive call)
-    peer.on('call', async (call) => {
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-        call.answer(mic); // Hum apna mic bhejenge baat karne ke liye
-        
-        call.on('stream', (remoteStream) => {
-            document.getElementById('remoteVideo').srcObject = remoteStream;
-            document.getElementById('status').innerText = "Status: Live!";
+    peer.on('call', async call => {
+        // Dusre side se bhi mic enable karein baat karne ke liye
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        call.answer(stream);
+        call.on('stream', remStream => {
+            document.getElementById('remoteView').srcObject = remStream;
+            document.getElementById('stText').innerText = "Live!";
         });
     });
 </script>
