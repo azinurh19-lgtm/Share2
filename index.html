@@ -3,53 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIN ST - Guide Mode</title>
+    <title>AZIN ST - Support Mode</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        :root { --primary: #ef4444; --bg: #0f172a; }
-        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; overflow: hidden; }
-        .setup-box { padding: 20px; text-align: center; background: #1e293b; border-radius: 15px; margin: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        :root { --primary: #3b82f6; --accent: #ef4444; --bg: #0f172a; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; text-align: center; }
         
-        /* Red Dot Animation */
-        .cursor-dot {
+        .container { padding: 20px; max-width: 500px; margin: auto; }
+        .card { background: #1e293b; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        .btn { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; }
+        .btn:active { transform: scale(0.98); }
+        .btn-copy { background: #22c55e; margin-top: 5px; font-size: 14px; padding: 8px; }
+        
+        .link-box { background: #0f172a; padding: 12px; border-radius: 8px; margin: 15px 0; border: 1px dashed var(--primary); word-break: break-all; color: #fbbf24; font-size: 13px; }
+        
+        #remote-video { width: 100vw; height: 100vh; object-fit: contain; background: #000; display: none; }
+        
+        /* Red Dot Cursor */
+        .dot {
             position: absolute;
-            width: 30px;
-            height: 30px;
-            background: rgba(239, 68, 68, 0.6);
-            border: 2px solid #ff0000;
+            width: 35px;
+            height: 35px;
+            background: rgba(239, 68, 68, 0.5);
+            border: 2px solid var(--accent);
             border-radius: 50%;
             pointer-events: none;
-            z-index: 9999;
+            z-index: 10000;
             transform: translate(-50%, -50%);
             display: none;
         }
-        .dot-pulse {
-            animation: pulse 0.6s ease-out;
-        }
-        @keyframes pulse {
+        .pulse { animation: pulse-ani 0.7s ease-out; }
+        @keyframes pulse-ani {
             0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
             100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
         }
-
-        #remote-video { width: 100vw; height: 100vh; object-fit: contain; background: black; display: none; cursor: crosshair; }
-        .btn { background: #3b82f6; border: none; padding: 15px; color: white; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; }
-        .link-display { background: #334155; padding: 10px; margin: 10px 0; font-size: 11px; color: #fbbf24; border-radius: 5px; word-break: break-all; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
-    <div id="guider-dot" class="cursor-dot"></div>
+    <div id="cursor-dot" class="dot"></div>
 
-    <div id="ui-container" class="setup-box">
-        <h2>AZIN ST Guide</h2>
-        <p id="status">Connecting to server...</p>
-        
-        <div id="master-panel">
-            <button class="btn" id="gen-btn" onclick="generateLink()">Guide Link Banayein</button>
-            <div id="link-box" class="hidden">
-                <div class="link-display" id="url-text"></div>
-                <p>Ise WhatsApp karein aur isi page par ruke rahein.</p>
+    <div id="setup-ui" class="container">
+        <div class="card">
+            <h2 style="color:var(--primary)">AZIN ST Support</h2>
+            <p id="status-text" style="color:#94a3b8">Server se connect ho raha hai...</p>
+            
+            <div id="master-controls">
+                <button class="btn" onclick="generateLink()">Guide Link Banayein</button>
+                <div id="link-section" class="hidden">
+                    <div class="link-box" id="final-url"></div>
+                    <button class="btn btn-copy" onclick="copyText()">Copy Link</button>
+                    <p style="font-size: 12px; margin-top: 10px;">Link WhatsApp karein aur isi page par rukein.</p>
+                </div>
+            </div>
+
+            <div id="target-controls" class="hidden">
+                <h3>Connecting...</h3>
+                <p>Kripya Screen Share allow karein taaki hum aapki madad kar sakein.</p>
             </div>
         </div>
     </div>
@@ -58,75 +70,89 @@
 
     <script>
         const peer = new Peer();
-        const videoEl = document.getElementById('remote-video');
-        const dot = document.getElementById('guider-dot');
-        let dataConn = null;
+        const videoElement = document.getElementById('remote-video');
+        const statusText = document.getElementById('status-text');
+        const dotElement = document.getElementById('cursor-dot');
+        let dataConnection = null;
 
-        peer.on('open', id => {
-            document.getElementById('status').innerText = "System Ready ✅";
-            window.myId = id;
+        peer.on('open', (id) => {
+            statusText.innerText = "System Ready ✅";
+            window.myPeerId = id;
         });
 
         function generateLink() {
-            const link = window.location.href.split('?')[0] + "?guide=" + window.myId;
-            document.getElementById('url-text').innerText = link;
-            document.getElementById('link-box').classList.remove('hidden');
-            document.getElementById('gen-btn').classList.add('hidden');
+            const baseUrl = window.location.href.split('?')[0];
+            const fullLink = `${baseUrl}?guideId=${window.myPeerId}`;
+            document.getElementById('final-url').innerText = fullLink;
+            document.getElementById('link-section').classList.remove('hidden');
         }
 
-        // --- Logic for Master (Aapka Mobile) ---
-        videoEl.onclick = function(e) {
-            if (dataConn) {
-                // Percentage mein position bhejna taaki har screen size par sahi dikhe
-                const x = (e.clientX / window.innerWidth) * 100;
-                const y = (e.clientY / window.innerHeight) * 100;
-                dataConn.send({ x, y });
+        function copyText() {
+            const url = document.getElementById('final-url').innerText;
+            navigator.clipboard.writeText(url);
+            alert("Link copy ho gaya!");
+        }
+
+        // Tap/Click Position bhejna
+        videoElement.onclick = function(e) {
+            if (dataConnection) {
+                const rect = videoElement.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                dataConnection.send({ x, y });
             }
         };
 
-        // --- Connection Handling ---
-        const params = new URLSearchParams(window.location.search);
-        const guideId = params.get('guide');
+        // URL Check
+        const urlParams = new URLSearchParams(window.location.search);
+        const guideId = urlParams.get('guideId');
 
         if (guideId) {
-            // TARGET MOBILE (Family Member)
-            document.getElementById('ui-container').innerHTML = "<h3>Guiding Mode Active</h3><p>Screen share allow karein...</p>";
-            
-            async function startTarget() {
+            // TARGET MOBILE LOGIC
+            document.getElementById('master-controls').classList.add('hidden');
+            document.getElementById('target-controls').classList.remove('hidden');
+
+            async function startTargetStream() {
                 try {
                     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                     peer.call(guideId, stream);
                     
-                    // Data receive karne ke liye connection
+                    // Master se data connect karna cursor ke liye
                     const conn = peer.connect(guideId);
-                    conn.on('data', data => {
-                        // Red Dot dikhana
-                        dot.style.display = 'block';
-                        dot.style.left = data.x + "%";
-                        dot.style.top = data.y + "%";
-                        dot.classList.remove('dot-pulse');
-                        void dot.offsetWidth; // Reset animation
-                        dot.classList.add('dot-pulse');
+                    conn.on('data', (data) => {
+                        dotElement.style.display = 'block';
+                        dotElement.style.left = data.x + "%";
+                        dotElement.style.top = data.y + "%";
+                        dotElement.classList.remove('pulse');
+                        void dotElement.offsetWidth; // Trigger reflow
+                        dotElement.classList.add('pulse');
                     });
-                } catch (err) { alert("Permission Denied!"); }
+                } catch (err) {
+                    alert("Permission Denied! Browser settings check karein.");
+                }
             }
-            setTimeout(startTarget, 1000);
+            setTimeout(startTargetStream, 1500);
 
         } else {
-            // MASTER MOBILE (Aapka Phone)
-            peer.on('call', call => {
+            // MASTER MOBILE LOGIC
+            peer.on('call', (call) => {
                 call.answer();
-                call.on('stream', stream => {
-                    document.getElementById('ui-container').style.display = 'none';
-                    videoEl.style.display = 'block';
-                    videoEl.srcObject = stream;
+                call.on('stream', (remoteStream) => {
+                    document.getElementById('setup-ui').classList.add('hidden');
+                    videoElement.style.display = 'block';
+                    videoElement.srcObject = remoteStream;
                 });
             });
 
-            peer.on('connection', conn => {
-                dataConn = conn; // Pointer data bhejne ke liye
+            peer.on('connection', (conn) => {
+                dataConnection = conn;
             });
         }
+
+        peer.on('error', (err) => {
+            console.error(err);
+            statusText.innerText = "Error: Connection lost.";
+        });
     </script>
 </body>
 </html>
