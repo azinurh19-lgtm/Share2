@@ -3,40 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIN ST - Support Mode</title>
+    <title>AZIN ST - Live Remote</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        :root { --primary: #3b82f6; --accent: #ef4444; --bg: #0f172a; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; text-align: center; }
+        :root { --primary: #3b82f6; --bg: #000; --card: #1e293b; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; overflow: hidden; }
         
-        .container { padding: 20px; max-width: 500px; margin: auto; }
-        .card { background: #1e293b; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        
-        .btn { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; }
-        .btn:active { transform: scale(0.98); }
-        .btn-copy { background: #22c55e; margin-top: 5px; font-size: 14px; padding: 8px; }
-        
-        .link-box { background: #0f172a; padding: 12px; border-radius: 8px; margin: 15px 0; border: 1px dashed var(--primary); word-break: break-all; color: #fbbf24; font-size: 13px; }
-        
-        #remote-video { width: 100vw; height: 100vh; object-fit: contain; background: #000; display: none; }
-        
-        /* Red Dot Cursor */
-        .dot {
-            position: absolute;
-            width: 35px;
-            height: 35px;
-            background: rgba(239, 68, 68, 0.5);
-            border: 2px solid var(--accent);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 10000;
-            transform: translate(-50%, -50%);
-            display: none;
+        /* UI Container */
+        .setup-container { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--card); padding: 30px; border-radius: 20px; 
+            width: 85%; max-width: 400px; text-align: center; z-index: 100;
         }
-        .pulse { animation: pulse-ani 0.7s ease-out; }
+
+        /* Live Video Style */
+        #remote-video { 
+            width: 100vw; height: 100vh; object-fit: contain; 
+            display: none; background: #000;
+        }
+
+        .btn { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-copy { background: #22c55e; margin-top: 5px; font-size: 14px; }
+        .link-box { background: #0f172a; padding: 10px; border-radius: 8px; margin: 15px 0; border: 1px dashed #3b82f6; word-break: break-all; color: #fbbf24; font-size: 12px; }
+
+        /* Guidance Dot */
+        .dot {
+            position: absolute; width: 40px; height: 40px;
+            background: rgba(255, 0, 0, 0.4); border: 2px solid red;
+            border-radius: 50%; pointer-events: none; z-index: 1000;
+            transform: translate(-50%, -50%); display: none;
+        }
+        .pulse { animation: pulse-ani 0.6s ease-out; }
         @keyframes pulse-ani {
             0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
         }
         .hidden { display: none; }
     </style>
@@ -45,114 +45,109 @@
 
     <div id="cursor-dot" class="dot"></div>
 
-    <div id="setup-ui" class="container">
-        <div class="card">
-            <h2 style="color:var(--primary)">AZIN ST Support</h2>
-            <p id="status-text" style="color:#94a3b8">Server se connect ho raha hai...</p>
-            
-            <div id="master-controls">
-                <button class="btn" onclick="generateLink()">Guide Link Banayein</button>
-                <div id="link-section" class="hidden">
-                    <div class="link-box" id="final-url"></div>
-                    <button class="btn btn-copy" onclick="copyText()">Copy Link</button>
-                    <p style="font-size: 12px; margin-top: 10px;">Link WhatsApp karein aur isi page par rukein.</p>
-                </div>
+    <div id="setup-ui" class="setup-container">
+        <h2 style="margin-top:0">AZIN ST Live</h2>
+        <p id="status" style="font-size:14px; color:#94a3b8">Connecting...</p>
+        
+        <div id="master-side">
+            <button class="btn" onclick="generateLink()">Link Generate Karein</button>
+            <div id="link-area" class="hidden">
+                <div class="link-box" id="copy-url"></div>
+                <button class="btn btn-copy" onclick="copyLink()">Copy Link</button>
             </div>
+        </div>
 
-            <div id="target-controls" class="hidden">
-                <h3>Connecting...</h3>
-                <p>Kripya Screen Share allow karein taaki hum aapki madad kar sakein.</p>
-            </div>
+        <div id="target-side" class="hidden">
+            <p>Wait karein, screen share chalu ho raha hai...</p>
         </div>
     </div>
 
-    <video id="remote-video" autoplay playsinline></video>
+    <video id="remote-video" autoplay playsinline muted></video>
 
     <script>
         const peer = new Peer();
-        const videoElement = document.getElementById('remote-video');
-        const statusText = document.getElementById('status-text');
-        const dotElement = document.getElementById('cursor-dot');
-        let dataConnection = null;
+        const video = document.getElementById('remote-video');
+        const dot = document.getElementById('cursor-dot');
+        let dataConn = null;
 
         peer.on('open', (id) => {
-            statusText.innerText = "System Ready ✅";
-            window.myPeerId = id;
+            document.getElementById('status').innerText = "System Ready ✅";
+            window.myId = id;
         });
 
         function generateLink() {
-            const baseUrl = window.location.href.split('?')[0];
-            const fullLink = `${baseUrl}?guideId=${window.myPeerId}`;
-            document.getElementById('final-url').innerText = fullLink;
-            document.getElementById('link-section').classList.remove('hidden');
+            const link = window.location.href.split('?')[0] + "?connect=" + window.myId;
+            document.getElementById('copy-url').innerText = link;
+            document.getElementById('link-area').classList.remove('hidden');
         }
 
-        function copyText() {
-            const url = document.getElementById('final-url').innerText;
-            navigator.clipboard.writeText(url);
+        function copyLink() {
+            navigator.clipboard.writeText(document.getElementById('copy-url').innerText);
             alert("Link copy ho gaya!");
         }
 
-        // Tap/Click Position bhejna
-        videoElement.onclick = function(e) {
-            if (dataConnection) {
-                const rect = videoElement.getBoundingClientRect();
-                const x = ((e.clientX - rect.left) / rect.width) * 100;
-                const y = ((e.clientY - rect.top) / rect.height) * 100;
-                dataConnection.send({ x, y });
+        // Tap to Guide
+        video.onclick = (e) => {
+            if (dataConn) {
+                const x = (e.clientX / window.innerWidth) * 100;
+                const y = (e.clientY / window.innerHeight) * 100;
+                dataConn.send({ x, y });
             }
         };
 
-        // URL Check
         const urlParams = new URLSearchParams(window.location.search);
-        const guideId = urlParams.get('guideId');
+        const connectId = urlParams.get('connect');
 
-        if (guideId) {
-            // TARGET MOBILE LOGIC
-            document.getElementById('master-controls').classList.add('hidden');
-            document.getElementById('target-controls').classList.remove('hidden');
+        if (connectId) {
+            // TARGET MOBILE
+            document.getElementById('master-side').classList.add('hidden');
+            document.getElementById('target-side').classList.remove('hidden');
 
-            async function startTargetStream() {
+            async function startLive() {
                 try {
-                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                    peer.call(guideId, stream);
-                    
-                    // Master se data connect karna cursor ke liye
-                    const conn = peer.connect(guideId);
-                    conn.on('data', (data) => {
-                        dotElement.style.display = 'block';
-                        dotElement.style.left = data.x + "%";
-                        dotElement.style.top = data.y + "%";
-                        dotElement.classList.remove('pulse');
-                        void dotElement.offsetWidth; // Trigger reflow
-                        dotElement.classList.add('pulse');
+                    // Optimized Stream for Mobile
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { frameRate: 30, cursor: "always" },
+                        audio: true
                     });
+                    
+                    const call = peer.call(connectId, stream);
+                    const conn = peer.connect(connectId);
+                    
+                    conn.on('data', (data) => {
+                        dot.style.display = 'block';
+                        dot.style.left = data.x + "%";
+                        dot.style.top = data.y + "%";
+                        dot.classList.remove('pulse');
+                        void dot.offsetWidth;
+                        dot.classList.add('pulse');
+                    });
+
+                    // Agar sharing band ho jaye toh reload
+                    stream.getVideoTracks()[0].onended = () => location.reload();
+
                 } catch (err) {
-                    alert("Permission Denied! Browser settings check karein.");
+                    alert("Permission Denied! Settings mein 'Screen Recording' allow karein.");
                 }
             }
-            setTimeout(startTargetStream, 1500);
+            setTimeout(startLive, 2000);
 
         } else {
-            // MASTER MOBILE LOGIC
+            // MASTER MOBILE (Aapka Mobile)
             peer.on('call', (call) => {
-                call.answer();
+                call.answer(); 
                 call.on('stream', (remoteStream) => {
-                    document.getElementById('setup-ui').classList.add('hidden');
-                    videoElement.style.display = 'block';
-                    videoElement.srcObject = remoteStream;
+                    document.getElementById('setup-ui').style.display = 'none';
+                    video.style.display = 'block';
+                    video.srcObject = remoteStream;
+                    video.play(); // Force play
                 });
             });
 
             peer.on('connection', (conn) => {
-                dataConnection = conn;
+                dataConn = conn;
             });
         }
-
-        peer.on('error', (err) => {
-            console.error(err);
-            statusText.innerText = "Error: Connection lost.";
-        });
     </script>
 </body>
 </html>
