@@ -3,97 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIN ST - Final Fix</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>AZIN ST - Remote Link</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0b0e14; color: white; text-align: center; padding: 10px; }
-        .box { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; }
-        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; height: 250px; object-fit: cover; }
-        .btn { background: #238636; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; cursor: pointer; }
-        .status { font-size: 12px; color: #8b949e; margin: 10px 0; }
-        #remoteControls { display: none; margin-top: 10px; gap: 5px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; text-align: center; padding: 20px; }
+        .card { background: #1e293b; padding: 25px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .btn { background: #3b82f6; border: none; padding: 15px; color: white; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .share-link { background: #334155; padding: 10px; border-radius: 5px; margin: 15px 0; font-size: 12px; color: #fbbf24; word-break: break-all; border: 1px dashed #fbbf24; }
+        video { width: 100%; border-radius: 10px; background: #000; margin-top: 20px; border: 2px solid #3b82f6; }
+        .status { color: #22c55e; font-size: 14px; margin-bottom: 10px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
-<div class="box">
-    <h2>AZIN ST Pro</h2>
-    
-    <div id="host-ui">
-        <button class="btn" style="background:#1f6feb;" onclick="makeLink()">Generate Link</button>
-        <p id="linkDisplay" style="font-size:10px; word-break:break-all; margin-top:10px; color:#58a6ff;"></p>
+    <div class="card" id="main-ui">
+        <h2>AZIN ST Remote Control</h2>
+        <p class="status" id="status-msg">System Ready...</p>
+        
+        <div id="step-1">
+            <button class="btn" onclick="generateRemoteLink()">Generate Support Link</button>
+        </div>
+
+        <div id="step-2" class="hidden">
+            <p>Ise Target Mobile par bhejein:</p>
+            <div class="share-link" id="link-text"></div>
+            <p style="font-size: 12px;">Waiting for family member to click...</p>
+        </div>
+
+        <div id="step-3" class="hidden">
+            <p>Target Mobile Connected!</p>
+            <video id="remote-video" autoplay playsinline></video>
+            <p style="font-size: 13px; color: #94a3b8;">Note: Browser control allow nahi karta, sirf dekh sakte hain aur baat kar sakte hain.</p>
+        </div>
     </div>
 
-    <div id="join-ui" style="display:none;">
-        <button class="btn" onclick="startStream('screen')">Share Mobile Screen</button>
-        <button class="btn" style="background:#8957e5;" onclick="startStream('camera')">Open Camera</button>
-    </div>
+    <script>
+        let peer = new Peer();
+        let myId = "";
 
-    <p class="status" id="status">Status: Connecting to PeerServer...</p>
-    
-    <video id="v-view" autoplay playsinline></video>
-</div>
-
-<script>
-    // Google STUN Servers jo connection ko block hone se bachate hain
-    const peerConfig = {
-        config: {
-            'iceServers': [
-                { url: 'stun:stun.l.google.com:19302' },
-                { url: 'stun:stun1.l.google.com:19302' }
-            ]
-        }
-    };
-
-    const peer = new Peer(peerConfig);
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinID = urlParams.get('join');
-
-    peer.on('open', id => {
-        document.getElementById('status').innerText = "Status: Online";
-        if(joinID) {
-            document.getElementById('host-ui').style.display = 'none';
-            document.getElementById('join-ui').style.display = 'block';
-        }
-    });
-
-    function makeLink() {
-        const link = window.location.href.split('?')[0] + "?join=" + peer.id;
-        document.getElementById('linkDisplay').innerText = link;
-        navigator.clipboard.writeText(link);
-        alert("Link Copy Ho Gaya!");
-    }
-
-    async function startStream(mode) {
-        try {
-            let stream;
-            if(mode === 'screen') {
-                stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-            } else {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            }
-
-            const call = peer.call(joinID, stream);
-            document.getElementById('status').innerText = "Streaming...";
-
-            call.on('stream', remoteStream => {
-                document.getElementById('v-view').srcObject = remoteStream;
-            });
-        } catch (e) {
-            alert("Error: " + e.message);
-        }
-    }
-
-    peer.on('call', async call => {
-        // Answer with Mic to enable two-way talk
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-        call.answer(mic);
-        call.on('stream', remoteStream => {
-            document.getElementById('v-view').srcObject = remoteStream;
-            document.getElementById('status').innerText = "Live Connected!";
+        // Peer ID generate hote hi
+        peer.on('open', (id) => {
+            myId = id;
         });
-    });
-</script>
 
+        function generateRemoteLink() {
+            if(!myId) return alert("System connect ho raha hai, wait karein...");
+            
+            // Current URL ke saath Peer ID attach karna
+            const baseUrl = window.location.href.split('?')[0];
+            const finalLink = `${baseUrl}?connectTo=${myId}`;
+            
+            document.getElementById('link-text').innerText = finalLink;
+            document.getElementById('step-1').classList.add('hidden');
+            document.getElementById('step-2').classList.remove('hidden');
+            document.getElementById('status-msg').innerText = "Link Generated!";
+        }
+
+        // Check karein kya ye link kisi target ne click kiya hai
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetId = urlParams.get('connectTo');
+
+        if (targetId) {
+            // AGAR TARGET MOBILE HAI (Jisne link click kiya)
+            document.getElementById('status-msg').innerText = "Connecting to Master...";
+            document.getElementById('step-1').innerHTML = "<p>Connecting... Please allow Screen & Mic</p>";
+
+            async function startStreaming() {
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                    const call = peer.call(targetId, stream);
+                    document.getElementById('step-1').innerHTML = "<h3>Sharing Live...</h3>";
+                } catch (err) {
+                    alert("Permission mandatory hai!");
+                }
+            }
+            // Thoda wait karke screen mangna
+            setTimeout(startStreaming, 1000);
+
+        } else {
+            // AGAR AAPKA MOBILE HAI (Master)
+            peer.on('call', (call) => {
+                call.answer(); // Answer without sending stream
+                call.on('stream', (remoteStream) => {
+                    document.getElementById('step-2').classList.add('hidden');
+                    document.getElementById('step-3').classList.remove('hidden');
+                    document.getElementById('remote-video').srcObject = remoteStream;
+                    document.getElementById('status-msg').innerText = "Connected & Receiving...";
+                });
+            });
+        }
+    </script>
 </body>
 </html>
