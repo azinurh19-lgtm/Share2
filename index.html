@@ -3,96 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIN ST - Remote Link</title>
+    <title>AZIN ST - Remote Support</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; text-align: center; padding: 20px; }
-        .card { background: #1e293b; padding: 25px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .btn { background: #3b82f6; border: none; padding: 15px; color: white; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
-        .share-link { background: #334155; padding: 10px; border-radius: 5px; margin: 15px 0; font-size: 12px; color: #fbbf24; word-break: break-all; border: 1px dashed #fbbf24; }
-        video { width: 100%; border-radius: 10px; background: #000; margin-top: 20px; border: 2px solid #3b82f6; }
-        .status { color: #22c55e; font-size: 14px; margin-bottom: 10px; }
-        .hidden { display: none; }
+        :root { --primary: #3b82f6; --bg: #0f172a; --card: #1e293b; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { background: var(--card); padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); width: 90%; max-width: 500px; text-align: center; }
+        h2 { color: var(--primary); margin-bottom: 10px; }
+        .status-dot { height: 10px; width: 10px; background: #22c55e; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .btn { background: var(--primary); color: white; border: none; padding: 15px 25px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 15px; transition: 0.3s; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn-red { background: #ef4444; }
+        .link-box { background: #334155; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px dashed var(--primary); word-break: break-all; font-family: monospace; color: #fbbf24; cursor: pointer; }
+        #remote-video { width: 100%; border-radius: 12px; border: 2px solid #334155; margin-top: 20px; background: #000; display: none; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div class="card" id="main-ui">
-        <h2>AZIN ST Remote Control</h2>
-        <p class="status" id="status-msg">System Ready...</p>
+    <div class="container">
+        <h2>AZIN ST Remote</h2>
+        <div id="connection-status"><span class="status-dot"></span> Server Se Connect Ho Raha Hai...</div>
         
-        <div id="step-1">
-            <button class="btn" onclick="generateRemoteLink()">Generate Support Link</button>
+        <div id="master-view">
+            <p style="font-size: 14px; color: #94a3b8;">Link generate karke family member ko bhejein</p>
+            <button class="btn" id="gen-btn" onclick="generateLink()">Link Generate Karein</button>
+            <div id="link-area" style="display: none;">
+                <div class="link-box" id="shareable-link" onclick="copyLink()"></div>
+                <p style="font-size: 12px;">Link par click karte hi connection shuru ho jayega.</p>
+            </div>
         </div>
 
-        <div id="step-2" class="hidden">
-            <p>Ise Target Mobile par bhejein:</p>
-            <div class="share-link" id="link-text"></div>
-            <p style="font-size: 12px;">Waiting for family member to click...</p>
-        </div>
-
-        <div id="step-3" class="hidden">
-            <p>Target Mobile Connected!</p>
-            <video id="remote-video" autoplay playsinline></video>
-            <p style="font-size: 13px; color: #94a3b8;">Note: Browser control allow nahi karta, sirf dekh sakte hain aur baat kar sakte hain.</p>
+        <div id="video-area">
+            <video id="remote-video" autoplay playsinline controls></video>
+            <div id="loading" class="loader"></div>
+            <button id="hangup" class="btn btn-red" style="display: none;" onclick="location.reload()">Connection Kaatein</button>
         </div>
     </div>
 
     <script>
-        let peer = new Peer();
+        const peer = new Peer();
+        const videoEl = document.getElementById('remote-video');
+        const loader = document.getElementById('loading');
+        const statusMsg = document.getElementById('connection-status');
         let myId = "";
 
-        // Peer ID generate hote hi
+        // 1. Peer ID milne par
         peer.on('open', (id) => {
             myId = id;
+            statusMsg.innerHTML = '<span class="status-dot"></span> System Ready';
         });
 
-        function generateRemoteLink() {
-            if(!myId) return alert("System connect ho raha hai, wait karein...");
-            
-            // Current URL ke saath Peer ID attach karna
-            const baseUrl = window.location.href.split('?')[0];
-            const finalLink = `${baseUrl}?connectTo=${myId}`;
-            
-            document.getElementById('link-text').innerText = finalLink;
-            document.getElementById('step-1').classList.add('hidden');
-            document.getElementById('step-2').classList.remove('hidden');
-            document.getElementById('status-msg').innerText = "Link Generated!";
+        // 2. Link Generation Logic
+        function generateLink() {
+            const url = window.location.href.split('?')[0];
+            const link = `${url}?partner=${myId}`;
+            document.getElementById('shareable-link').innerText = link;
+            document.getElementById('link-area').style.display = 'block';
+            document.getElementById('gen-btn').style.display = 'none';
         }
 
-        // Check karein kya ye link kisi target ne click kiya hai
+        function copyLink() {
+            const text = document.getElementById('shareable-link').innerText;
+            navigator.clipboard.writeText(text);
+            alert("Link copy ho gaya! Ab ise WhatsApp karein.");
+        }
+
+        // 3. Connection Handling
         const urlParams = new URLSearchParams(window.location.search);
-        const targetId = urlParams.get('connectTo');
+        const partnerId = urlParams.get('partner');
 
-        if (targetId) {
-            // AGAR TARGET MOBILE HAI (Jisne link click kiya)
-            document.getElementById('status-msg').innerText = "Connecting to Master...";
-            document.getElementById('step-1').innerHTML = "<p>Connecting... Please allow Screen & Mic</p>";
-
-            async function startStreaming() {
+        if (partnerId) {
+            // --- TARGET MOBILE LOGIC ---
+            document.getElementById('master-view').innerHTML = "<h3>Connecting to Master...</h3><p>Kripya Screen Share allow karein.</p>";
+            
+            async function startSharing() {
                 try {
-                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                    const call = peer.call(targetId, stream);
-                    document.getElementById('step-1').innerHTML = "<h3>Sharing Live...</h3>";
+                    const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: true, 
+                        audio: true 
+                    });
+                    peer.call(partnerId, stream);
+                    document.getElementById('master-view').innerHTML = "<h3>Sharing Live... ✅</h3>";
                 } catch (err) {
-                    alert("Permission mandatory hai!");
+                    alert("Permission Error: Screen share allow karna zaroori hai.");
                 }
             }
-            // Thoda wait karke screen mangna
-            setTimeout(startStreaming, 1000);
+            setTimeout(startSharing, 1500);
 
         } else {
-            // AGAR AAPKA MOBILE HAI (Master)
+            // --- MASTER MOBILE LOGIC (Aapka Phone) ---
             peer.on('call', (call) => {
-                call.answer(); // Answer without sending stream
+                statusMsg.innerText = "Connecting...";
+                loader.style.display = "block";
+                
+                call.answer(); // Stream receive karna
                 call.on('stream', (remoteStream) => {
-                    document.getElementById('step-2').classList.add('hidden');
-                    document.getElementById('step-3').classList.remove('hidden');
-                    document.getElementById('remote-video').srcObject = remoteStream;
-                    document.getElementById('status-msg').innerText = "Connected & Receiving...";
+                    loader.style.display = "none";
+                    videoEl.style.display = "block";
+                    document.getElementById('hangup').style.display = "block";
+                    document.getElementById('master-view').style.display = "none";
+                    videoEl.srcObject = remoteStream;
+                    statusMsg.innerText = "Connected: Viewing Remote Mobile";
                 });
             });
         }
+
+        peer.on('error', (err) => {
+            console.error(err);
+            alert("Connection fail ho gaya. Dono taraf internet check karein.");
+        });
     </script>
 </body>
 </html>
